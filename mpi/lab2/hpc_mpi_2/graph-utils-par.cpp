@@ -44,13 +44,14 @@ static int* getSerializedGraphPart(Graph* graph) {
     return message;
 }
 
-static Graph* createGraphFromBuffer(int* buffer, int numVertices, int numProcesses, int srcRank, int numElems) {
-    int firstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank);
-    int lastIdxExcl = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank + 1);
+static void createGraphFromBuffer(int* buffer, Graph* graph) {//int numVertices, int numProcesses, int srcRank, int numElems) {
+    // int firstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank);
+    // int lastIdxExcl = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank + 1);
 
-    Graph* graph = allocateGraphPart(numVertices, firstIdx, lastIdxExcl);
+    // Graph* graph = allocateGraphPart(numVertices, firstIdx, lastIdxExcl);
 
-    int numRows = lastIdxExcl - firstIdx; //numElems / numVertices;
+    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl; //numElems / numVertices;
+    int numVertices = graph->numVertices;
 
     // int** rows = (int**) malloc(sizeof(int*) * numRows);
     int idx;
@@ -62,7 +63,16 @@ static Graph* createGraphFromBuffer(int* buffer, int numVertices, int numProcess
         }
     }
 
-    return graph;
+    // return graph;
+}
+
+static fillGraphPart(Graph* graph) {
+    int numRows = getNumRows(graph);
+    int firstIdx = graph->firstRowIdxIncl;
+    for (int i = 0; i < numRows; ++i) {
+        initializeGraphRow(graph->data[i], firstIdx, graph->numVertices);
+        firstIdx++;
+    }
 }
 
 static int getNumElemsPerGivenProcess(int numVertices, int numProcesses, int myRank) {
@@ -130,31 +140,75 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     assert(graph->firstRowIdxIncl >= 0 && graph->lastRowIdxExcl <= graph->numVertices);
 
     /* FIXME: implement */
-    int numRows = getNumRows(graph);
-    int firstIdx = graph->firstRowIdxIncl;
-    for (int i = 0; i < numRows; ++i) {
-        initializeGraphRow(graph->data[i], firstIdx, graph->numVertices);
-        firstIdx++;
+    if (myRank == 0) {
+        // int numRows = getNumRows(graph);
+        // int firstIdx = graph->firstRowIdxIncl;
+        // for (int i = 0; i < numRows; ++i) {
+        //     initializeGraphRow(graph->data[i], firstIdx, graph->numVertices);
+        //     firstIdx++;
+        // }
+        fillGraphPart(graph);
     }
 
-    int* serializedGraph = getSerializedGraphPart(graph);
+    // int* serializedGraph = getSerializedGraphPart(graph);
     // int numElems = getNumElemsPerGivenProcess(numVertices, numProcesses, myRank);
-    int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
-    int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
+    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
+    int numElems = numRows * numVertices;
+
+    // int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
+     //maxRowsPerProcess * numVertices);
 
     int elemsCountPerGivenProcess;
     int* buffParam;
-    for (int src = 0; src < numProcesses; ++src) {
-        elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
-        buffParam = src == myRank ? serializedGraph : receiveBuffer;
 
-        MPI_Bcast(
-            buffParam,
-            elemsCountPerGivenProcess,
-            MPI_INT,
-            src,
-            MPI_COMM_WORLD
-        );
+    Graph* toSend;
+    MPI_Status status;
+    // the first graph keeps to itself since it is a sender, hence starting from 1
+    if (myRank == 0) {
+        for (int src = 1; src < numProcesses; ++src) {
+            elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
+    
+            // if (myRank == 0) {
+                toSend = allocateGraphPart(numVertices, getFirstGraphRowOfProcess(src), getFirstGraphRowOfProcess(src + 1));
+                fillGraphPart(toSend);
+                buffParam = getSerializedGraphPart(graph);
+            // }
+    
+            // buffParam = src == myRank ? serializedGraph : receiveBuffer;
+    
+            // MPI_Bcast(
+            //     receiveBuffer,
+            //     elemsCountPerGivenProcess,
+            //     MPI_INT,
+            //     src,
+            //     MPI_COMM_WORLD
+            // );
+             MPI_Send(buffParam,  /* pointer to the message */
+                elemsCountPerGivenProcess, /* number of items in the message */
+                MPI_INT, /* type of data in the message */
+                src, /* rank of the destination process */
+                0, /* app-defined message type */
+                MPI_COMM_WORLD /* communicator to use */
+               );
+
+            freeGraphPart(toSend);
+            free(buffParam);
+    }
+    else {
+        int* receiveBuffer = (int*) malloc(sizeof(int) * numElems);
+         MPI_Recv(receiveBuffer, /* where the message will be saved */
+            numElems, /* max number of elements we expect */
+            MPI_INT, /* type of data in the message */
+            0, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
+            0, /* if not MPI_ANY_TAG, receive only with a certain tag */
+            MPI_COMM_WORLD, /* communicator to use */
+            &status /* if not MPI_STATUS_IGNORE, write comm info here */
+
+           );
+
+        createGraphFromBuffer(receiveBuffer, graph);
+        free(receiveBuffer);
+    }
     }
     // }
     // MPI_Ibcast(
@@ -163,9 +217,9 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     //     MPI_INT,
     //     myRank,
     //     MPI_COMM_WORLD
-    // );
-    free(serializedGraph);
-    free(receiveBuffer);
+    // // );
+    // free(serializedGraph);
+    // free(receiveBuffer);
 
     return graph;
 }
