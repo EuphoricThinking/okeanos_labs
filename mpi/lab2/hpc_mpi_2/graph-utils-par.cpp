@@ -12,22 +12,31 @@
 
 int getFirstGraphRowOfProcess(int numVertices, int numProcesses, int myRank) {
     /* FIXME: implement */
-    auto graph = allocateGraphPart(numVertices, myRank, get_last_excl_idx_of_my_part(numVertices, numProcesses, myRank));
 
-    if (graph == nullptr) {
-        return nullptr;
+    if (numVertices < numProcesses) {
+        return myRank < numVertices ? myRank : -1;
     }
+    else {
+        int even_per_process = numVertices / numProcesses;
+        int rest_vertices = numVertices % numProcesses;
 
-    assert(graph->numVertices > 0 && graph->numVertices == numVertices);
+        if (rest_vertices == 0) {
+            return even_per_process * myRank;
+        }
+        else {
+            // distribute the remaining part evenly among modulo first processes
+            if (myRank < rest_vertices) {
+                return (even_per_process + 1) * myRank;
+            }
+            else {
+                int base = (even_per_process + 1) * rest_vertices;
+                int above_modulo = myRank - rest_vertices;
 
-    int my_num_vertices = graph->lastRowIdxExcl - graph->firstRowIdxIncl
-
-    for (int i = graph->firstRowIdxIncl; i < graph->lastRowIdxExcl; ++i) {
-        initializeGraphRow(graph->data[i], i, graph->numVertices);
+                return base + above_modulo * even_per_process;
+            }
+        }
     }
-
-
-    return myRank;
+    // return per_process * myRank; //myRank;
 }
 
 Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
@@ -47,6 +56,9 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     assert(graph->firstRowIdxIncl >= 0 && graph->lastRowIdxExcl <= graph->numVertices);
 
     /* FIXME: implement */
+    for (int i = 0; i < graph->numVertices; ++i) {
+        initializeGraphRow(graph->data[i], i, graph->numVertices);
+    }
 
     return graph;
 }
