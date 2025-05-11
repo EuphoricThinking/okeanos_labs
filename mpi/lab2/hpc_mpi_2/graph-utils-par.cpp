@@ -44,6 +44,27 @@ static int* getSerializedGraphPart(Graph* graph) {
     return message;
 }
 
+static Graph* createGraphFromBuffer(int* buffer, int numVertices, int numProcesses, int srcRank, int numElems) {
+    int firstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank);
+    int lastIdxExcl = getFirstGraphRowOfProcess(numVertices, numProcesses, srcRank + 1);
+
+    Graph* graph = allocateGraphPart(numVertices, firstIdx, lastIdxExcl);
+
+    int numRows = lastIdxExcl - firstIdx; //numElems / numVertices;
+
+    // int** rows = (int**) malloc(sizeof(int*) * numRows);
+    int idx;
+    for (int i = 0; i < numRows; i++) {
+        rows[i] = (int*) malloc(sizeof(int) * numVertices);
+        idx = numVertices * i;
+        for (int j = 0; j < numVertices; j++) {
+            graph->data[i][j] = buffer[idx + j];
+        }
+    }
+
+    return graph;
+}
+
 static int getNumElemsPerGivenProcess(int numVertices, int numProcesses, int myRank) {
     int even_per_process = numVertices / numProcesses;
     int rest_vertices = numVertices % numProcesses;
