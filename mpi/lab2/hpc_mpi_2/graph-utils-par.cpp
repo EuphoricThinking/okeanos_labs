@@ -56,7 +56,7 @@ static void createGraphFromBuffer(int* buffer, Graph* graph) {//int numVertices,
     // int** rows = (int**) malloc(sizeof(int*) * numRows);
     int idx;
     for (int i = 0; i < numRows; i++) {
-        rows[i] = (int*) malloc(sizeof(int) * numVertices);
+        // rows[i] = (int*) malloc(sizeof(int) * numVertices);
         idx = numVertices * i;
         for (int j = 0; j < numVertices; j++) {
             graph->data[i][j] = buffer[idx + j];
@@ -66,9 +66,10 @@ static void createGraphFromBuffer(int* buffer, Graph* graph) {//int numVertices,
     // return graph;
 }
 
-static fillGraphPart(Graph* graph) {
+static void fillGraphPart(Graph* graph) {
     int numRows = getNumRows(graph);
     int firstIdx = graph->firstRowIdxIncl;
+    printf("idx: %d\n", firstIdx);
     for (int i = 0; i < numRows; ++i) {
         initializeGraphRow(graph->data[i], firstIdx, graph->numVertices);
         firstIdx++;
@@ -140,6 +141,8 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     assert(graph->firstRowIdxIncl >= 0 && graph->lastRowIdxExcl <= graph->numVertices);
 
     /* FIXME: implement */
+    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
+
     if (myRank == 0) {
         // int numRows = getNumRows(graph);
         // int firstIdx = graph->firstRowIdxIncl;
@@ -148,11 +151,15 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
         //     firstIdx++;
         // }
         fillGraphPart(graph);
+        int idx = graph->firstRowIdxIncl;
+        for (int i = 0; i < numRows; i++) {
+            printGraphRow(graph->data[i], idx, numVertices);idx++;
+        }
+        printf("me\n");
     }
 
     // int* serializedGraph = getSerializedGraphPart(graph);
     // int numElems = getNumElemsPerGivenProcess(numVertices, numProcesses, myRank);
-    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
     int numElems = numRows * numVertices;
 
     // int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
@@ -169,9 +176,16 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
             elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
     
             // if (myRank == 0) {
-                toSend = allocateGraphPart(numVertices, getFirstGraphRowOfProcess(src), getFirstGraphRowOfProcess(src + 1));
+                toSend = allocateGraphPart(numVertices, getFirstGraphRowOfProcess(numVertices, numProcesses, src), getFirstGraphRowOfProcess(numVertices, numProcesses, src + 1));
                 fillGraphPart(toSend);
-                buffParam = getSerializedGraphPart(graph);
+                buffParam = getSerializedGraphPart(toSend);
+
+                int* iterator = buffParam;
+                int srcFirstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, src);
+                for (int i = 0; i < elemsCountPerGivenProcess / numVertices; ++i) {
+                    printGraphRow(iterator, srcFirstIdx, numVertices);
+                    iterator = iterator + numVertices;
+                }
             // }
     
             // buffParam = src == myRank ? serializedGraph : receiveBuffer;
@@ -193,6 +207,8 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
 
             freeGraphPart(toSend);
             free(buffParam);
+        }
+        printf("BLAH\n");
     }
     else {
         int* receiveBuffer = (int*) malloc(sizeof(int) * numElems);
@@ -209,7 +225,9 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
         createGraphFromBuffer(receiveBuffer, graph);
         free(receiveBuffer);
     }
-    }
+
+    return graph;
+}
     // }
     // MPI_Ibcast(
     //     serializedGraph,
@@ -221,8 +239,7 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     // free(serializedGraph);
     // free(receiveBuffer);
 
-    return graph;
-}
+
 
 void collectAndPrintGraph(Graph* graph, int numProcesses, int myRank) {
     assert(numProcesses >= 1 && myRank >= 0 && myRank < numProcesses);
