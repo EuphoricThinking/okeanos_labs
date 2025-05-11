@@ -151,11 +151,11 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
         //     firstIdx++;
         // }
         fillGraphPart(graph);
-        int idx = graph->firstRowIdxIncl;
-        for (int i = 0; i < numRows; i++) {
-            printGraphRow(graph->data[i], idx, numVertices);idx++;
-        }
-        printf("me\n");
+        // int idx = graph->firstRowIdxIncl;
+        // for (int i = 0; i < numRows; i++) {
+        //     printGraphRow(graph->data[i], idx, numVertices);idx++;
+        // }
+        // printf("me\n");
     }
 
     // int* serializedGraph = getSerializedGraphPart(graph);
@@ -180,12 +180,12 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
                 fillGraphPart(toSend);
                 buffParam = getSerializedGraphPart(toSend);
 
-                int* iterator = buffParam;
-                int srcFirstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, src);
-                for (int i = 0; i < elemsCountPerGivenProcess / numVertices; ++i) {
-                    printGraphRow(iterator, srcFirstIdx, numVertices);
-                    iterator = iterator + numVertices;
-                }
+                // int* iterator = buffParam;
+                // int srcFirstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, src);
+                // for (int i = 0; i < elemsCountPerGivenProcess / numVertices; ++i) {
+                //     printGraphRow(iterator, srcFirstIdx, numVertices);
+                //     iterator = iterator + numVertices;
+                // }
             // }
     
             // buffParam = src == myRank ? serializedGraph : receiveBuffer;
@@ -247,38 +247,80 @@ void collectAndPrintGraph(Graph* graph, int numProcesses, int myRank) {
     assert(graph->firstRowIdxIncl >= 0 && graph->lastRowIdxExcl <= graph->numVertices);
 
     /* FIXME: implement */
-    int* serializedGraph = getSerializedGraphPart(graph);
+    // int* serializedGraph = getSerializedGraphPart(graph);
     int numVertices = graph->numVertices;
-    int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
-    int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
+    // int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
+    // int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
 
-    int elemsCountPerGivenProcess;
-    int* buffParam;
-    for (int src = 0; src < numProcesses; ++src) {
-        elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
-        buffParam = src == myRank ? serializedGraph : receiveBuffer;
+    // int elemsCountPerGivenProcess;
+    // int* buffParam;
 
-        MPI_Bcast(
-            buffParam,
-            elemsCountPerGivenProcess,
-            MPI_INT,
-            src,
-            MPI_COMM_WORLD
-        );
-    
-        if (myRank == 0) {
-            int* iterator = buffParam;
-            int srcFirstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, src); // redundant in print Function
+    MPI_Status status;
+    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
 
-            for (int i = 0; i < elemsCountPerGivenProcess / numVertices; ++i) {
-                printGraphRow(iterator, srcFirstIdx, numVertices);
-                iterator = iterator + numVertices;
-            }
+    if (myRank == 0) {
+        int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
+        int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
+        int elemsCountPerGivenProcess;
+
+        // first: print myself
+        int myIdx = graph->firstRowIdxIncl;
+        for (int i = 0; i < numRows; ++i) {
+            printGraphRow(graph->data[i], myIdx, graph->numVertices);
+            myIdx++;
         }
+
+        for (int src = 1; src < numProcesses; ++src) {
+            elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
+            // buffParam = src == myRank ? serializedGraph : receiveBuffer;
+
+            // MPI_Bcast(
+            //     buffParam,
+            //     elemsCountPerGivenProcess,
+            //     MPI_INT,
+            //     src,
+            //     MPI_COMM_WORLD
+            // );
+         MPI_Recv(receiveBuffer, /* where the message will be saved */
+            elemsCountPerGivenProcess, /* max number of elements we expect */
+            MPI_INT, /* type of data in the message */
+            src, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
+            0, /* if not MPI_ANY_TAG, receive only with a certain tag */
+            MPI_COMM_WORLD, /* communicator to use */
+            &status /* if not MPI_STATUS_IGNORE, write comm info here */
+
+           );
+
+            // if (myRank == 0) {
+                int* iterator = receiveBuffer; //buffParam;
+                int srcFirstIdx = getFirstGraphRowOfProcess(numVertices, numProcesses, src); // redundant in print Function
+
+                for (int i = 0; i < elemsCountPerGivenProcess / numVertices; ++i) {
+                    printGraphRow(iterator, srcFirstIdx, numVertices);
+                    iterator = iterator + numVertices;
+                }
+            // }
+        }
+
+        free(receiveBuffer);
+    }
+    else {
+        int* serializedGraph = getSerializedGraphPart(graph);
+        int numElems = numRows * numVertices;
+
+        MPI_Send(serializedGraph,  /* pointer to the message */
+            numElems, /* number of items in the message */
+            MPI_INT, /* type of data in the message */
+            0, /* rank of the destination process */
+            0, /* app-defined message type */
+            MPI_COMM_WORLD /* communicator to use */
+           );
+
+           free(serializedGraph);
     }
 
-    free(serializedGraph);
-    free(receiveBuffer);
+    // free(serializedGraph);
+    // free(receiveBuffer);
 }
 
 void destroyGraph(Graph* graph, int numProcesses, int myRank) {
