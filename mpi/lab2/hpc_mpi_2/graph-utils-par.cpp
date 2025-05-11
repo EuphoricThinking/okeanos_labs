@@ -30,7 +30,7 @@ static int getMaxNumRowsPerProcess(int numVertices, int numProcesses) {
 static int* getSerializedGraphPart(Graph* graph) {
     int numRows = getNumRows(graph);
     int numVertices = graph->numVertices;
-    int* message = malloc(sizeof(int) * (numVertices * numRows));
+    int* message = (int*) malloc(sizeof(int) * (numVertices * numRows));
 
     int idx;
     for (int row = 0; row < numRows; ++row) {
@@ -119,11 +119,11 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     int* serializedGraph = getSerializedGraphPart(graph);
     // int numElems = getNumElemsPerGivenProcess(numVertices, numProcesses, myRank);
     int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
-    int* receiveBuffer = malloc(sizeof(int) * maxRowsPerProcess * numVertices);
+    int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
 
-    int perGivenProcess;
+    int elemsCountPerGivenProcess;
     int* buffParam;
-    for (int src = 0; src < numProcesses; ++src {
+    for (int src = 0; src < numProcesses; ++src) {
         elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
         buffParam = src == myRank ? serializedGraph : receiveBuffer;
 
@@ -134,7 +134,7 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
             src,
             MPI_COMM_WORLD
         );
-    
+    }
     // }
     // MPI_Ibcast(
     //     serializedGraph,
@@ -143,6 +143,8 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     //     myRank,
     //     MPI_COMM_WORLD
     // );
+    free(serializedGraph);
+    free(receiveBuffer);
 
     return graph;
 }
@@ -154,12 +156,13 @@ void collectAndPrintGraph(Graph* graph, int numProcesses, int myRank) {
 
     /* FIXME: implement */
     int* serializedGraph = getSerializedGraphPart(graph);
+    int numVertices = graph->numVertices;
     int maxRowsPerProcess = getMaxNumRowsPerProcess(numVertices, numProcesses);
-    int* receiveBuffer = malloc(sizeof(int) * maxRowsPerProcess * numVertices);
+    int* receiveBuffer = (int*) malloc(sizeof(int) * maxRowsPerProcess * numVertices);
 
-    int perGivenProcess;
+    int elemsCountPerGivenProcess;
     int* buffParam;
-    for (int src = 0; src < numProcesses; ++src {
+    for (int src = 0; src < numProcesses; ++src) {
         elemsCountPerGivenProcess = getNumElemsPerGivenProcess(numVertices, numProcesses, src);
         buffParam = src == myRank ? serializedGraph : receiveBuffer;
 
@@ -181,6 +184,9 @@ void collectAndPrintGraph(Graph* graph, int numProcesses, int myRank) {
             }
         }
     }
+
+    free(serializedGraph);
+    free(receiveBuffer);
 }
 
 void destroyGraph(Graph* graph, int numProcesses, int myRank) {
