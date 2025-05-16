@@ -1,6 +1,7 @@
 #include "distributed-helpers.h"
 
 int get_num_rows_per_process(int numVertices, int numProcesses) {
+    // shuold difgfer by at most one row
     return numVertices / numProcesses;
 
 }
@@ -22,7 +23,7 @@ int get_num_rows_per_process(int numVertices, int numProcesses) {
 // }
 
 int get_last_excl_idx_of_my_part(int numVertices, int numProcesses, int myRank) {
-    // the last one always covers the taill
+    // the last one always covers the tail
     if (myRank == numProcesses - 1) {
         // exlusive
         return numVertices;

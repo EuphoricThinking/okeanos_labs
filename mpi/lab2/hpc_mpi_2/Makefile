@@ -6,7 +6,7 @@ CC          := mpic++  # or CC on okeanos
 # Available flags:
 # -DUSE_RANDOM_GRAPH=1   --- generates a random graph
 # -DUSE_RANDOM_SEED=123  --- uses a given seed to generate a random graph
-CFLAGS      := -O3 -Wall -c -DUSE_RANDOM_GRAPH=1 -DUSE_RANDOM_SEED=123
+CFLAGS      := -O3 -Wall -c -DUSE_RANDOM_GRAPH=1 -DUSE_RANDOM_SEED=123 -g
 LFLAGS      := -O3 -Wall
 ALL         := \
 	generator-seq.exe \

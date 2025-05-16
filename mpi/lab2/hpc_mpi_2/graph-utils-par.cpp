@@ -81,37 +81,47 @@ static int getNumElemsPerGivenProcess(int numVertices, int numProcesses, int myR
     }
 }
 
+static int min(int a, int b) {
+    if (a > b) return b;
+    return a;
+}
+
 int getFirstGraphRowOfProcess(int numVertices, int numProcesses, int myRank) {
     /* FIXME: implement */
+    int even_per_process = numVertices / numProcesses;
+    int rest_vertices = numVertices % numProcesses;
 
-    // however, main cuts the number of processes to numVertices
-    if (numVertices < numProcesses) {
-        return myRank < numVertices ? myRank : -1;
-    }
-    else {
-        int even_per_process = numVertices / numProcesses;
-        int rest_vertices = numVertices % numProcesses;
+    return myRank * even_per_process + min(myRank, rest_vertices);
 
 
-        // even_pe_process*myrank + min(myrank, modulo)
-        // owbner_of_k najpier, pozniej po k
-        if (rest_vertices == 0) {
-            return even_per_process * myRank;
-        }
-        else {
-            // distribute the remaining part evenly among first modulo processes
-            if (myRank < rest_vertices) {
-                return (even_per_process + 1) * myRank;
-            }
-            else {
-                // the first modulo processes get one more row
-                int base = (even_per_process + 1) * rest_vertices;
-                int above_modulo = myRank - rest_vertices;
+    // // however, main cuts the number of processes to numVertices
+    // if (numVertices < numProcesses) {
+    //     return myRank < numVertices ? myRank : -1;
+    // }
+    // else {
+    //     int even_per_process = numVertices / numProcesses;
+    //     int rest_vertices = numVertices % numProcesses;
 
-                return base + above_modulo * even_per_process;
-            }
-        }
-    }
+
+    //     // even_pe_process*myrank + min(myrank, modulo)
+    //     // owbner_of_k najpier, pozniej po k
+    //     if (rest_vertices == 0) {
+    //         return even_per_process * myRank;
+    //     }
+    //     else {
+    //         // distribute the remaining part evenly among first modulo processes
+    //         if (myRank < rest_vertices) {
+    //             return (even_per_process + 1) * myRank;
+    //         }
+    //         else {
+    //             // the first modulo processes get one more row
+    //             int base = (even_per_process + 1) * rest_vertices;
+    //             int above_modulo = myRank - rest_vertices;
+
+    //             return base + above_modulo * even_per_process;
+    //         }
+    //     }
+    // }
 }
 
 Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
@@ -123,7 +133,7 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
             getFirstGraphRowOfProcess(numVertices, numProcesses, myRank + 1)
     );
 
-    printf("my rank: %d, first row: %d, last row: %d\n", myRank, graph->firstRowIdxIncl, graph->lastRowIdxExcl);
+    // printf("my rank: %d, first row: %d, last row: %d\n", myRank, graph->firstRowIdxIncl, graph->lastRowIdxExcl);
 
     if (graph == nullptr) {
         return nullptr;

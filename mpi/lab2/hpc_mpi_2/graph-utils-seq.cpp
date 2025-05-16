@@ -8,6 +8,7 @@
 #include "graph-base.h"
 #include "graph-utils.h"
 
+
 Graph *createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
     assert(numProcesses == 1 && myRank == 0);
 

@@ -110,34 +110,43 @@ static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank)
     int* kth_row = (int*) malloc(sizeof(int) * numVertices);
 
     int k_owner;
+    int k_owner_row;
+    int next_k_owner_row;
 
-    for (int k = 0; k < numVertices; k++) {
-        k_owner = get_owner_of_k(k, numVertices, numProcesses);
-        printf("k owner %d, my rank %d, k %d, my row: %d\n", k_owner, myRank, k,is_my_row(k, graph));
+    for (k_owner = 0; k_owner < numProcesses; k_owner++) {
+        k_owner_row = getFirstGraphRowOfProcess(numVertices, numProcesses, k_owner);
+        next_k_owner_row = getFirstGraphRowOfProcess(numVertices, numProcesses, k_owner + 1);
+
+        // for (int k = 0; k < numVertices; k++) {
+        for (int k = k_owner_row; k < next_k_owner_row; k++) {
+            // k_owner = get_owner_of_k(k, numVertices, numProcesses);
+            // printf("k owner %d, my rank %d, k %d, my row: %d\n", k_owner, myRank, k,is_my_row(k, graph));
 
 
-        if (k_owner == myRank) {
-        // if (is_my_row(k, graph)) {
-            // printf(" is my row: %d rank %d numVer: %d\n", k, myRank, numVertices);
-            write_to_k_buffer(k, graph, kth_row);
-        }
 
-        MPI_Bcast(
-            kth_row,
-            numVertices,
-            MPI_INT,
-            // myRank,
-            k_owner,
-            MPI_COMM_WORLD
-        );
+            if (k_owner == myRank) {
+            // if (is_my_row(k, graph)) {
+                // printf(" is my row: %d rank %d numVer: %d\n", k, myRank, numVertices);
+                write_to_k_buffer(k, graph, kth_row);
+            }
 
-        // printer(kth_row, numVertices, myRank, k);
+            MPI_Bcast(
+                kth_row,
+                numVertices,
+                MPI_INT,
+                // myRank,
+                k_owner,
+                MPI_COMM_WORLD
+            );
 
-        for (int i = 0; i < numRows; i++) {
-            for (int j = 0; j < numVertices; j++) {
-                int pathSum = graph->data[i][k] + kth_row[j];
-                if (graph->data[i][j] > pathSum) {
-                    graph->data[i][j] = pathSum;
+            // printer(kth_row, numVertices, myRank, k);
+
+            for (int i = 0; i < numRows; i++) {
+                for (int j = 0; j < numVertices; j++) {
+                    int pathSum = graph->data[i][k] + kth_row[j];
+                    if (graph->data[i][j] > pathSum) {
+                        graph->data[i][j] = pathSum;
+                    }
                 }
             }
         }
