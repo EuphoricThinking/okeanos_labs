@@ -52,8 +52,28 @@ static void printer(int* kth_row, int numVertices, int myRank, int k) {
     printf("\n");
 }
 
-static int get_owner_of_k(int k, int numProcesses) {
-    return k / numProcesses;
+static int get_owner_of_k(int k, int numVertices, int numProcesses) {
+    int per_process = numVertices / numProcesses;
+    int rest_processes = numVertices % numProcesses;
+    
+    if (rest_processes == 0) {
+        return k / per_process;
+    }
+    else {
+        int one_more_row_per_process = rest_processes * (per_process + 1);
+
+        if (one_more_row_per_process > k) {
+            return k / (per_process + 1);
+        }
+        else {
+            int new_k = k - one_more_row_per_process;
+            int base = k / (per_process + 1);
+            // int idx = base 
+
+            return (new_k / per_process) + base;
+        }
+
+    }
 } 
 
 static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank) {
@@ -74,9 +94,16 @@ static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank)
 
     int* kth_row = (int*) malloc(sizeof(int) * numVertices);
 
+    int k_owner;
+
     for (int k = 0; k < numVertices; k++) {
-        if (is_my_row(k, graph)) {
-            printf(" is my row: %d rank %d numVer: %d\n", k, myRank, numVertices);
+        k_owner = get_owner_of_k(k, numVertices, numProcesses);
+        // printf("k owner %d, my rank %d, k %d, my row: %d\n", k_owner, myRank, k,is_my_row(k, graph));
+
+
+        if (k_owner == myRank) {
+        // if (is_my_row(k, graph)) {
+            // printf(" is my row: %d rank %d numVer: %d\n", k, myRank, numVertices);
             write_to_k_buffer(k, graph, kth_row);
         }
 
@@ -84,11 +111,12 @@ static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank)
             kth_row,
             numVertices,
             MPI_INT,
-            myRank,
+            // myRank,
+            k_owner,
             MPI_COMM_WORLD
         );
 
-        printer(kth_row, numVertices, myRank, k);
+        // printer(kth_row, numVertices, myRank, k);
 
         for (int i = 0; i < numRows; i++) {
             for (int j = 0; j < numVertices; j++) {
@@ -169,7 +197,7 @@ int main(int argc, char *argv[]) {
             << numVertices
             << "-node graph with "
             << numProcesses
-            << " process(es): "
+            << " process(es):\n "
             << endTime - startTime
             << std::endl;
 
