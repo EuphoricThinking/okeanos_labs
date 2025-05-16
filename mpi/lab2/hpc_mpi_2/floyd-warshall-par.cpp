@@ -35,7 +35,7 @@ static int get_relative_idx(int k, Graph* graph) {
 
 static void write_to_k_buffer(int k, Graph* graph, int* k_buffer) {
     int idx = get_relative_idx(k, graph);
-    printf("rel idx: %d num rows %d\n", idx, graph->lastRowIdxExcl - graph->firstRowIdxIncl);
+    // printf("rel idx: %d num rows %d\n", idx, graph->lastRowIdxExcl - graph->firstRowIdxIncl);
 
     for (int i = 0; i < graph->numVertices; i++) {
         k_buffer[i] = graph->data[idx][i];
@@ -98,7 +98,7 @@ static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank)
 
     for (int k = 0; k < numVertices; k++) {
         k_owner = get_owner_of_k(k, numVertices, numProcesses);
-        // printf("k owner %d, my rank %d, k %d, my row: %d\n", k_owner, myRank, k,is_my_row(k, graph));
+        printf("k owner %d, my rank %d, k %d, my row: %d\n", k_owner, myRank, k,is_my_row(k, graph));
 
 
         if (k_owner == myRank) {
