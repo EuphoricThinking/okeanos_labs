@@ -8,12 +8,79 @@
 #include <string>
 #include <cassert>
 #include <mpi.h>
+#include <stdbool.h>
 #include "graph-base.h"
 #include "graph-utils.h"
 
 
+static bool is_my_row(int row_idx, Graph* graph) {
+    return (row_idx >= graph->firstRowIdxIncl) && (row_idx < graph->lastRowIdxExcl);
+}
+
+static void fill_graph_with_inf(Graph* graph) {
+    int num_rows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
+
+    for (int row = 0; row < num_rows; row++) {
+        for (int col = 0; col < graph->numVertices; col++) {
+            graph[row][col] = INT_MAX;
+        }
+    }
+}
+
+static int get_relative_idx(int k, Graph* graph) {
+    int firstIdx = graph->firstRowIdxIncl;
+
+    return k - firstIdx;
+}
+
+static void write_to_k_buffer(int k, Graph* graph, int* k_buffer) {
+    int idx = get_relative_idx(k, graph);
+
+    for (int i = 0; i < graph->numVertices; i++) {
+        k_buffer[i] = graph->data[idx][i];
+    }
+}
+
 static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank) {
+    int numVertices = graph->numVertices;
     assert(numProcesses <= graph->numVertices);
+
+    auto graph_to_fill = allocateGraphPart(
+        numVertices,
+        getFirstGraphRowOfProcess(numVertices, numProcesses, myRank),
+        getFirstGraphRowOfProcess(numVertices, numProcesses, myRank + 1)
+    );
+
+    int num_rows = graph_to_fill->lastRowIdxExcl - graph_to_fill->firstRowIdxIncl;
+
+    fill_graph_with_inf(graph_to_fill);
+
+    int* kth_row = malloc(sizeof(int) * numVertices);
+
+    for (int k = 0; k < numVertices; k++) {
+        if (is_my_row(k, graph)) {
+            write_to_k_buffer(k, graph, kth_row);
+        }
+
+        MPI_Bcast(
+            kth_row,
+            numVertices,
+            MPI_INT,
+            myRank,
+            MPI_COMM_WORLD
+        );
+
+        for (int i = 0; i < numRows; i++) {
+            for (int j = 0; j < numVertices; j++) {
+                int pathSum = graph->data[i][k] + kth_row[j];
+                if (graph->data[i][j] > pathSum) {
+                    graph->data[i][j] = pathSum;
+                }
+            }
+        }
+    }
+        
+    free(kth_row);
 
     /* FIXME: implement */
 }
