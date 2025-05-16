@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include "graph-base.h"
 #include "graph-utils.h"
+#include <stdlib.h>
 
 
 static bool is_my_row(int row_idx, Graph* graph) {

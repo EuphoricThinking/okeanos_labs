@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include "graph-base.h"
 #include "graph-utils.h"
+#include <stdlib.h>
 
 
 static int getNumRows(Graph* graph) {
