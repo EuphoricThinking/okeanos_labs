@@ -17,15 +17,15 @@ static bool is_my_row(int row_idx, Graph* graph) {
     return (row_idx >= graph->firstRowIdxIncl) && (row_idx < graph->lastRowIdxExcl);
 }
 
-static void fill_graph_with_inf(Graph* graph) {
-    int num_rows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
+// static void fill_graph_with_inf(Graph* graph) {
+//     int num_rows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
 
-    for (int row = 0; row < num_rows; row++) {
-        for (int col = 0; col < graph->numVertices; col++) {
-            graph[row][col] = INT_MAX;
-        }
-    }
-}
+//     for (int row = 0; row < num_rows; row++) {
+//         for (int col = 0; col < graph->numVertices; col++) {
+//             graph[row][col] = INT_MAX;
+//         }
+//     }
+// }
 
 static int get_relative_idx(int k, Graph* graph) {
     int firstIdx = graph->firstRowIdxIncl;
@@ -35,30 +35,48 @@ static int get_relative_idx(int k, Graph* graph) {
 
 static void write_to_k_buffer(int k, Graph* graph, int* k_buffer) {
     int idx = get_relative_idx(k, graph);
+    printf("rel idx: %d num rows %d\n", idx, graph->lastRowIdxExcl - graph->firstRowIdxIncl);
 
     for (int i = 0; i < graph->numVertices; i++) {
         k_buffer[i] = graph->data[idx][i];
     }
 }
 
+static void printer(int* kth_row, int numVertices, int myRank, int k) {
+    printf("my rankL %d | k: %d | ", myRank, k);
+
+    for (int i = 0; i < numVertices; i++) {
+        printf("%d ", kth_row[i]);
+    }
+
+    printf("\n");
+}
+
+static int get_owner_of_k(int k, int numProcesses) {
+    return k / numProcesses;
+} 
+
 static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank) {
     int numVertices = graph->numVertices;
     assert(numProcesses <= graph->numVertices);
 
-    auto graph_to_fill = allocateGraphPart(
-        numVertices,
-        getFirstGraphRowOfProcess(numVertices, numProcesses, myRank),
-        getFirstGraphRowOfProcess(numVertices, numProcesses, myRank + 1)
-    );
+    // auto graph_to_fill = allocateGraphPart(
+    //     numVertices,
+    //     getFirstGraphRowOfProcess(numVertices, numProcesses, myRank),
+    //     getFirstGraphRowOfProcess(numVertices, numProcesses, myRank + 1)
+    // );
 
-    int num_rows = graph_to_fill->lastRowIdxExcl - graph_to_fill->firstRowIdxIncl;
+    // int numRows = graph_to_fill->lastRowIdxExcl - graph_to_fill->firstRowIdxIncl;
 
-    fill_graph_with_inf(graph_to_fill);
+    int numRows = graph->lastRowIdxExcl - graph->firstRowIdxIncl;
 
-    int* kth_row = malloc(sizeof(int) * numVertices);
+    // fill_graph_with_inf(graph_to_fill);
+
+    int* kth_row = (int*) malloc(sizeof(int) * numVertices);
 
     for (int k = 0; k < numVertices; k++) {
         if (is_my_row(k, graph)) {
+            printf(" is my row: %d rank %d numVer: %d\n", k, myRank, numVertices);
             write_to_k_buffer(k, graph, kth_row);
         }
 
@@ -69,6 +87,8 @@ static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank)
             myRank,
             MPI_COMM_WORLD
         );
+
+        printer(kth_row, numVertices, myRank, k);
 
         for (int i = 0; i < numRows; i++) {
             for (int j = 0; j < numVertices; j++) {
