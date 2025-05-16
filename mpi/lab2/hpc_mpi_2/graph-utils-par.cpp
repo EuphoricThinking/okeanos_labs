@@ -14,6 +14,10 @@ static int getNumRows(Graph* graph) {
     return graph->lastRowIdxExcl - graph->firstRowIdxIncl;
 }
 
+// int getNumRows(Graph* graph) {
+//     return graph->lastRowIdxExcl - graph->firstRowIdxIncl;
+// }
+
 static int getMaxNumRowsPerProcess(int numVertices, int numProcesses) {
     int even_per_process = numVertices / numProcesses;
     int rest_vertices = numVertices % numProcesses;
@@ -88,6 +92,9 @@ int getFirstGraphRowOfProcess(int numVertices, int numProcesses, int myRank) {
         int even_per_process = numVertices / numProcesses;
         int rest_vertices = numVertices % numProcesses;
 
+
+        // even_pe_process*myrank + min(myrank, modulo)
+        // owbner_of_k najpier, pozniej po k
         if (rest_vertices == 0) {
             return even_per_process * myRank;
         }
@@ -115,6 +122,8 @@ Graph* createAndDistributeGraph(int numVertices, int numProcesses, int myRank) {
             getFirstGraphRowOfProcess(numVertices, numProcesses, myRank),
             getFirstGraphRowOfProcess(numVertices, numProcesses, myRank + 1)
     );
+
+    printf("my rank: %d, first row: %d, last row: %d\n", myRank, graph->firstRowIdxIncl, graph->lastRowIdxExcl);
 
     if (graph == nullptr) {
         return nullptr;

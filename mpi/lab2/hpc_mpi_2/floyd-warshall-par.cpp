@@ -69,12 +69,27 @@ static int get_owner_of_k(int k, int numVertices, int numProcesses) {
             int new_k = k - one_more_row_per_process;
             int base = k / (per_process + 1);
             // int idx = base 
+            int res = (new_k / per_process) + base; 
+            printf(" k %d >= %d | new_k: %d | base: %d | res: %d\n", k, one_more_row_per_process, new_k, base, res);
 
-            return (new_k / per_process) + base;
+            return res;
         }
 
     }
 } 
+
+
+/*
+proc = 4
+v = 5
+
+5 / 4 = 1
+0 1 | 2 | 3 | 4
+
+k = 4
+k_owner = 3
+new_k = 4 - 2 = 2;
+*/
 
 static void runFloydWarshallParallel(Graph* graph, int numProcesses, int myRank) {
     int numVertices = graph->numVertices;
