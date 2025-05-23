@@ -13,6 +13,17 @@
 
 #define OPTION_VERBOSE "--verbose"
 
+
+static double computeMax(double arr[], int num) {
+    double max = arr[0];
+    for (int i = 1; i < num; ++i) {
+        if (max < arr[i]) {
+            max = arr[i];
+        }
+    }
+    return max;
+}
+
 static void printUsage(char const* progName) {
     std::cerr << "Usage:" << std::endl <<
               "    " << progName << " [--verbose] <N>" << std::endl <<
@@ -106,7 +117,7 @@ static void sendRingSync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double
             rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
             0, /* if not MPI_ANY_TAG, receive only with a certain tag */
             MPI_COMM_WORLD, /* communicator to use */
-            &status /* if not MPI_STATUS_IGNORE, write comm info here */
+            status /* if not MPI_STATUS_IGNORE, write comm info here */
             );
 
             MPI_Send(sentRow,  /* pointer to the message */
@@ -137,6 +148,8 @@ static std::tuple<int, double> performAlgorithm(
 
     int rankWhoReceivesFromMe;
     int rankWhoSendsToMe;
+
+    double diffs[numProcesses];
 
     do {
         maxDiff = 0.0;
@@ -205,6 +218,30 @@ static std::tuple<int, double> performAlgorithm(
             }
         }
         ++numIterations;
+
+        MPI_Gather(
+            &maxDiff,
+            1 /* just one number */,
+            MPI_DOUBLE,
+            diffs,
+            1 /* one number per process */,
+            MPI_DOUBLE,
+            0,
+            MPI_COMM_WORLD
+        );
+
+        if (myRank == 0) {
+            maxDiff = computeMax(diffs, numProcesses);
+        }
+
+        MPI_Bcast(
+            &maxDiff,
+            1,
+            MPI_DOUBLE,
+            0,
+            MPI_COMM_WORLD
+        );
+
     } while (maxDiff > epsilon);
 
     
