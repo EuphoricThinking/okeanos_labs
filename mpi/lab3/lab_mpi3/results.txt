@@ -12,4 +12,6 @@ allreduce 8
 Statistics: duration(s)=0.0010321140 #iters=88 diff=0.0000032633 epsilon=0.0000036131
 Statistics: duration(s)=0.0009450912 #iters=88 diff=0.0000032633 epsilon=0.0000036131
 
-okeanos
+async 8 + allreduce
+Statistics: duration(s)=0.0004498959 #iters=108 diff=0.0000035236 epsilon=0.0000036131
+Statistics: duration(s)=0.0005569458 #iters=108 diff=0.0000035236 epsilon=0.0000036131

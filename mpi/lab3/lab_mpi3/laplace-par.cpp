@@ -130,8 +130,13 @@ static void sendRingSync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double
     }
 }
 
-static void sendAsync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double* sentRow, double* recvRow, MPI_Status* status, int myRank, int fragSize, MPI_Request* req_send, MPI_Request* req_recv, MPI_Status* statusSend) {
-    MPI_Wait(req_send, statusSend);
+static void sendAsync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double* sentRow, double* recvRow, MPI_Status* status, int myRank, int fragSize, MPI_Request* req_send, MPI_Request* req_recv, MPI_Status* statusSend, bool* start) {
+    if (*start) {
+        MPI_Wait(req_send, statusSend);
+    }
+    else {
+        *start = true;
+    }
 
     MPI_Isend(sentRow,  /* pointer to the message */
         fragSize, /* number of items in the message */
@@ -202,7 +207,7 @@ static std::tuple<int, double> performAlgorithm(
                         rankWhoSendsToMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
 
                         // sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
-                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend);
+                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend, &start);
                         // corner = true;
                     }
                     
@@ -211,7 +216,7 @@ static std::tuple<int, double> performAlgorithm(
                         rankWhoReceivesFromMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
                         rankWhoSendsToMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
                         // sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
-                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend);
+                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend, &start);
                     }
                 }
 
