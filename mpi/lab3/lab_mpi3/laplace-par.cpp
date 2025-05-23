@@ -79,6 +79,45 @@ static InputOptions parseInput(int argc, char * argv[], int numProcesses) {
 //     }
 //     else if
 // }
+static void sendRingSync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double* sentRow, double* recvRow, MPI_Status* status, int myRank, int fragSize) {
+
+    if (myRank == 0) {
+        MPI_Send(sentRow,  /* pointer to the message */
+            fragSize, /* number of items in the message */
+            MPI_DOUBLE, /* type of data in the message */
+            rankWhoReceivesFromMe, /* rank of the destination process */
+            0, /* app-defined message type */
+            MPI_COMM_WORLD /* communicator to use */
+           );
+
+        MPI_Recv(recvRow, /* where the message will be saved */
+        fragSize, /* max number of elements we expect */
+        MPI_DOUBLE, /* type of data in the message */
+        rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
+        0, /* if not MPI_ANY_TAG, receive only with a certain tag */
+        MPI_COMM_WORLD, /* communicator to use */
+        status /* if not MPI_STATUS_IGNORE, write comm info here */
+        );
+    }
+    else {
+        MPI_Recv(recvRow, /* where the message will be saved */
+            fragSize, /* max number of elements we expect */
+            MPI_DOUBLE, /* type of data in the message */
+            rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
+            0, /* if not MPI_ANY_TAG, receive only with a certain tag */
+            MPI_COMM_WORLD, /* communicator to use */
+            &status /* if not MPI_STATUS_IGNORE, write comm info here */
+            );
+
+            MPI_Send(sentRow,  /* pointer to the message */
+                fragSize, /* number of items in the message */
+                MPI_DOUBLE, /* type of data in the message */
+                rankWhoReceivesFromMe, /* rank of the destination process */
+                0, /* app-defined message type */
+                MPI_COMM_WORLD /* communicator to use */
+               );
+    }
+}
 
 static std::tuple<int, double> performAlgorithm(
   int myRank, int numProcesses, GridFragment *frag, double omega, double epsilon) {
@@ -96,8 +135,8 @@ static std::tuple<int, double> performAlgorithm(
     /* the following code just recomputes the appropriate grid fragment */
     /* but does not communicate the partial results */
 
-    int rankWhoReceivesFromMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
-    int rankWhoSendsToMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
+    int rankWhoReceivesFromMe;
+    int rankWhoSendsToMe;
 
     do {
         maxDiff = 0.0;
@@ -114,52 +153,47 @@ static std::tuple<int, double> performAlgorithm(
                 if (rowIdx == startRowIncl) {
                     repopulateArrary(sentRow, frag, endRowExcl - 1);
 
-                    if (myRank == 0) {
-                        MPI_Send(sentRow,  /* pointer to the message */
-                            fragSize, /* number of items in the message */
-                            MPI_DOUBLE, /* type of data in the message */
-                            rankWhoReceivesFromMe, /* rank of the destination process */
-                            0, /* app-defined message type */
-                            MPI_COMM_WORLD /* communicator to use */
-                           );
+                    rankWhoReceivesFromMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
+                    rankWhoSendsToMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
 
-                        MPI_Recv(recvRow, /* where the message will be saved */
-                        fragSize, /* max number of elements we expect */
-                        MPI_DOUBLE, /* type of data in the message */
-                        rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
-                        0, /* if not MPI_ANY_TAG, receive only with a certain tag */
-                        MPI_COMM_WORLD, /* communicator to use */
-                        &status /* if not MPI_STATUS_IGNORE, write comm info here */
-                        );
-                    }
-                    else {
-                        MPI_Recv(recvRow, /* where the message will be saved */
-                            fragSize, /* max number of elements we expect */
-                            MPI_DOUBLE, /* type of data in the message */
-                            rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
-                            0, /* if not MPI_ANY_TAG, receive only with a certain tag */
-                            MPI_COMM_WORLD, /* communicator to use */
-                            &status /* if not MPI_STATUS_IGNORE, write comm info here */
-                            );
-
-                            MPI_Send(sentRow,  /* pointer to the message */
-                                fragSize, /* number of items in the message */
-                                MPI_DOUBLE, /* type of data in the message */
-                                rankWhoReceivesFromMe, /* rank of the destination process */
-                                0, /* app-defined message type */
-                                MPI_COMM_WORLD /* communicator to use */
-                               );
-                    }
+                    sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
+                    // corner = true;
                 }
+                
+                if (rowIdx == endRowExcl) {
+                    repopulateArrary(sentRow, frag, startRowIncl);
+                    rankWhoReceivesFromMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
+                    rankWhoSendsToMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
+                    sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
+                }
+
                 for (int colIdx = 1 + (rowIdx % 2 == color ? 1 : 0); 
                      colIdx < frag->gridDimension - 1; 
                      colIdx += 2) {
-                    double tmp =
+                    double tmp;
+                    if (rowIdx == startRowIncl) {
+                        tmp = (recvRow[colIdx] + 
+                            GP(frag, rowIdx + 1, colIdx) +
+                            GP(frag, rowIdx, colIdx - 1) +
+                            GP(frag, rowIdx, colIdx + 1)
+                            ) / 4.0;
+                    }
+                    else if (rowIdx == endRowExcl - 1) {
+                        tmp = (GP(frag, rowIdx - 1, colIdx) +
+                                recvRow[colIdx] +
+                                GP(frag, rowIdx, colIdx - 1) +
+                                GP(frag, rowIdx, colIdx + 1)
+                            ) / 4.0;
+                    }
+                    else {
+                        tmp =
                             (GP(frag, rowIdx - 1, colIdx) +
                              GP(frag, rowIdx + 1, colIdx) +
                              GP(frag, rowIdx, colIdx - 1) +
                              GP(frag, rowIdx, colIdx + 1)
                             ) / 4.0;
+                    }
+
                     double diff = GP(frag, rowIdx, colIdx);
                     GP(frag, rowIdx, colIdx) = (1.0 - omega) * diff + omega * tmp;
                     diff = fabs(diff - GP(frag, rowIdx, colIdx));
