@@ -150,6 +150,7 @@ static std::tuple<int, double> performAlgorithm(
     int rankWhoSendsToMe;
 
     double diffs[numProcesses];
+    double finalMax;
 
     do {
         maxDiff = 0.0;
@@ -219,12 +220,13 @@ static std::tuple<int, double> performAlgorithm(
         }
         ++numIterations;
 
+        /*
         MPI_Gather(
             &maxDiff,
-            1 /* just one number */,
+            1,
             MPI_DOUBLE,
             diffs,
-            1 /* one number per process */,
+            1,
             MPI_DOUBLE,
             0,
             MPI_COMM_WORLD
@@ -241,6 +243,17 @@ static std::tuple<int, double> performAlgorithm(
             0,
             MPI_COMM_WORLD
         );
+        */
+
+        MPI_Allreduce(
+            &maxDiff,
+            &finalMax,
+            1,
+            MPI_DOUBLE,
+            MPI_MAX,
+            MPI_COMM_WORLD);
+        
+        maxDiff = finalMax;
 
     } while (maxDiff > epsilon);
 
