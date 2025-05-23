@@ -130,6 +130,29 @@ static void sendRingSync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double
     }
 }
 
+static void sendAsync(int rankWhoReceivesFromMe, int rankWhoSendsToMe, double* sentRow, double* recvRow, MPI_Status* status, int myRank, int fragSize, MPI_Request* req_send, MPI_Request* req_recv, MPI_Status* statusSend) {
+    MPI_Wait(req_send, statusSend);
+
+    MPI_Isend(sentRow,  /* pointer to the message */
+        fragSize, /* number of items in the message */
+        MPI_DOUBLE, /* type of data in the message */
+        rankWhoReceivesFromMe, /* rank of the destination process */
+        0, /* app-defined message type */
+        MPI_COMM_WORLD, /* communicator to use */
+        req_send
+       );
+
+    MPI_Irecv(recvRow, /* where the message will be saved */
+    fragSize, /* max number of elements we expect */
+    MPI_DOUBLE, /* type of data in the message */
+    rankWhoSendsToMe, /* if not MPI_ANY_SOURCE, receive only from source with the given rank  */
+    0, /* if not MPI_ANY_TAG, receive only with a certain tag */
+    MPI_COMM_WORLD, /* communicator to use */
+    //status, /* if not MPI_STATUS_IGNORE, write comm info here */
+    req_recv
+    );
+}
+
 static std::tuple<int, double> performAlgorithm(
   int myRank, int numProcesses, GridFragment *frag, double omega, double epsilon) {
     
@@ -152,40 +175,54 @@ static std::tuple<int, double> performAlgorithm(
     double diffs[numProcesses];
     double finalMax;
 
+    MPI_Request requestSend;
+    MPI_Request requestRecv;
+    bool start = false;
+
+    MPI_Status statusSend;
+    MPI_Status statusRecv;
+
     do {
         maxDiff = 0.0;
         double sentRow[fragSize];
         double recvRow[fragSize];
-        bool corner = false;
+        // bool corner = false;
 
         MPI_Status status;
 
         for (int color = 0; color < 2; ++color) {
             for (int rowIdx = startRowIncl; rowIdx < endRowExcl; ++rowIdx) {
                 // send the first row to the previous, the last row - to the next
-                // my last will be first for another one
-                if (rowIdx == startRowIncl) {
-                    repopulateArrary(sentRow, frag, endRowExcl - 1);
+                // my last will be the first for another one
+                if (color == 0) {
+                    if (rowIdx == startRowIncl) {
+                        repopulateArrary(sentRow, frag, endRowExcl - 1);
 
-                    rankWhoReceivesFromMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
-                    rankWhoSendsToMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
+                        rankWhoReceivesFromMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
+                        rankWhoSendsToMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
 
-                    sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
-                    // corner = true;
-                }
-                
-                if (rowIdx == endRowExcl) {
-                    repopulateArrary(sentRow, frag, startRowIncl);
-                    rankWhoReceivesFromMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
-                    rankWhoSendsToMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
-                    sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
+                        // sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
+                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend);
+                        // corner = true;
+                    }
+                    
+                    if (rowIdx == endRowExcl) {
+                        repopulateArrary(sentRow, frag, startRowIncl);
+                        rankWhoReceivesFromMe = myRank == 0 ? numProcesses - 1 : myRank - 1;
+                        rankWhoSendsToMe = myRank == numProcesses - 1 ? 0 : myRank + 1;
+                        // sendRingSync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize);
+                        sendAsync(rankWhoReceivesFromMe, rankWhoSendsToMe, sentRow, recvRow, &status, myRank, fragSize, &requestSend, &requestRecv, &statusSend);
+                    }
                 }
 
                 for (int colIdx = 1 + (rowIdx % 2 == color ? 1 : 0); 
                      colIdx < frag->gridDimension - 1; 
                      colIdx += 2) {
                     double tmp;
+
                     if (rowIdx == startRowIncl) {
+                        MPI_Wait(&requestRecv, &statusRecv);
+
                         tmp = (recvRow[colIdx] + 
                             GP(frag, rowIdx + 1, colIdx) +
                             GP(frag, rowIdx, colIdx - 1) +
@@ -193,6 +230,8 @@ static std::tuple<int, double> performAlgorithm(
                             ) / 4.0;
                     }
                     else if (rowIdx == endRowExcl - 1) {
+                        MPI_Wait(&requestRecv, &statusRecv);
+
                         tmp = (GP(frag, rowIdx - 1, colIdx) +
                                 recvRow[colIdx] +
                                 GP(frag, rowIdx, colIdx - 1) +
