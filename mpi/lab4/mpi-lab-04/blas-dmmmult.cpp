@@ -53,10 +53,8 @@ int main(int argc, char* argv[]) {
     auto startTime = std::chrono::steady_clock::now();
     // this segfaults for matrix size 5000 and more
 
-    // cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-    //             n, n, n,
-    //             1.0, A, n, B, n, 0.0, C, n);
-    handmadeMult(A, B, C, n);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, A, n, B, n, 0.0, C, n);
+    // handmadeMult(A, B, C, n);
     auto finishTime = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed{finishTime - startTime};
     std::cout << "CBLAS elapsed time: "<< elapsed.count() << "[s]" << std::endl;
