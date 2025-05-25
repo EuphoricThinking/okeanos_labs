@@ -7,6 +7,25 @@
 #include <random>
 #include <chrono>
 
+void handmadeMult(double* A, double* B, double* C, int rowSize) {
+    for (int i = 0; i < rowSize; i++) {
+
+        for (int j = 0; j < rowSize; j++) {
+
+            double cSum = 0;
+            for (int k = 0; k < rowSize; k++) {
+                int aIdx = i*rowSize + k;
+                int bIdx = k*rowSize + j;
+
+                cSum += A[aIdx] * B[bIdx];                
+            }
+
+            int cIdx = i*rowSize + j;
+            C[cIdx] = cSum;
+        }
+    }
+} 
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "invocation: " <<argv[0]<<" matrix_size " << std::endl;
