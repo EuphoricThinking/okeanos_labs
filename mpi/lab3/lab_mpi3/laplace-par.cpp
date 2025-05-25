@@ -280,6 +280,11 @@ static std::tuple<int, double> performAlgorithm(
             maxDiff = computeMax(diffs, numProcesses);
         }
 
+
+        // REDUCE + BCAST
+
+        // work on colors
+        
         MPI_Bcast(
             &maxDiff,
             1,
